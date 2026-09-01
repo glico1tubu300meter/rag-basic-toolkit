@@ -92,6 +92,50 @@ $ python query.py --index ../out --question "フランス料理のおすすめ�
 
 **この2つの例からわかること**: RAGの価値は「検索結果があれば正確に答えられる」ことだけでなく、**「検索結果が無ければ無理に答えない」という誠実さを引き出せる**点にもある。ただしこれはプロンプトの指示に依存する挙動であり、指示を外すと無関係な検索結果からもそれらしい回答を捏造することがある点には注意(`GROUNDED_SYSTEM_PROMPT` の指示文を参照)。
 
+## Agentic RAG(検索者・批評者・判定者)
+
+`query.py` は検索して1回で答えるだけだが、`agentic_query.py` は[LangGraph](https://github.com/langchain-ai/langgraph)で
+「検索者→批評者→(不足なら再検索)→判定者」という3役構成のグラフとして実装している。
+批評者が「情報が足りない」と判定した場合、提案されたクエリで自動的に再検索し、
+`--max_rounds`(既定2)まで繰り返す。
+
+```bash
+python agentic_query.py --index ../out --question "質問文をここに"
+```
+
+### 実行イメージ
+
+```
+$ python agentic_query.py --index ../out --question "RAGとは何ですか？"
+
+【検索者 (round 0)】query='RAGとは何ですか？'
+[1] RAG: RAG(Retrieval-Augmented Generation)は、大規模言語モデルの回答生成に...
+[2] FAISS: FAISSはMeta(旧Facebook)が開発した、高速な近似最近傍探索ライブラリ。...
+[3] LoRA: LoRA(Low-Rank Adaptation)は、大規模言語モデルを効率的にファインチューニング...
+
+【批評者 (round 0)】
+十分
+追加検索クエリ: なし
+
+【判定者】
+RAG（Retrieval-Augmented Generation）とは、大規模言語モデルの回答生成に外部知識源からの
+検索結果を組み合わせる手法です。これにより、モデル自体のパラメータを変更せずに最新情報や
+専門知識を反映することが可能になり、事実に基づいた正確な回答を生成しやすくなります。
+```
+
+このケースでは検索結果だけで十分と判定され、1ラウンドで終了した。批評者が「不足」と判定した場合は
+自動的に2ラウンド目の検索(`prepare_next_round`ノード)に進む。詳しい設計は
+`docs/agentic_rag_architecture.html` を参照。
+
+### `query.py` との違い
+
+| | `query.py` | `agentic_query.py` |
+|---|---|---|
+| 検索回数 | 1回のみ | 批評者が納得するまで最大`--max_rounds`回 |
+| 誤検索・情報不足への対応 | なし(検索結果をそのまま使う) | 批評者が不足を検知し、自動で再検索 |
+| 実装方式 | 素朴な関数呼び出し | LangGraphの`StateGraph`(ノード+条件分岐エッジ) |
+| 依存追加 | なし | `langchain-core`, `langchain-huggingface`, `langgraph` |
+
 ## 既知の注意点
 
 - **Windows + mmap の相性問題**: ネットワークドライブ等にモデルキャッシュを置いた環境で、7B級モデルを `from_pretrained` でロードするとセグメンテーション違反が発生することがある。本スクリプトでは `disable_mmap=True` を指定して回避している。

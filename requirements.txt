@@ -3,3 +3,6 @@ transformers==5.15.0
 bitsandbytes==0.46.1
 sentence-transformers==6.0.0
 faiss-cpu==1.15.0
+langchain-core==1.6.0
+langchain-huggingface==1.2.2
+langgraph==1.2.11

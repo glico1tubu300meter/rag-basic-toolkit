@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agentic RAG (LangGraph)</title>
+<style>
+:root{
+  --bg:#eef1f4;
+  --surface:#ffffff;
+  --surface-2:#f5f7f9;
+  --ink:#1b2430;
+  --ink-dim:#5b6773;
+  --line:#c7cfd6;
+  --line-strong:#98a4ae;
+  --accent-search:#1a6bb0;
+  --accent-search-soft:#e5eff8;
+  --accent-critic:#c9601a;
+  --accent-critic-soft:#fbeee1;
+  --accent-judge:#0f8a72;
+  --accent-judge-soft:#e6f5f1;
+  --accent-info:#5b46d6;
+  --accent-info-soft:#efecfc;
+  --tok-keyword:#8250df;
+  --tok-string:#0a7d4f;
+  --tok-comment:#6b7280;
+  --tok-number:#c2410c;
+  --tok-func:#1a6bb0;
+  --tok-class:#c9601a;
+  --font-sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#11151b; --surface:#1a212a; --surface-2:#20293380; --ink:#e7ecf1; --ink-dim:#8d9aa6;
+    --line:#313c47; --line-strong:#4a5865;
+    --accent-search:#6fb3e8; --accent-search-soft:#152b3f;
+    --accent-critic:#f0a15c; --accent-critic-soft:#3a2410;
+    --accent-judge:#3fddb6; --accent-judge-soft:#0f2e28;
+    --accent-info:#a495f5; --accent-info-soft:#2a2350;
+    --tok-keyword:#c297ff; --tok-string:#7ee2ac; --tok-comment:#8d9aa6;
+    --tok-number:#f0a15c; --tok-func:#6fb3e8; --tok-class:#f0a15c;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#11151b; --surface:#1a212a; --surface-2:#20293380; --ink:#e7ecf1; --ink-dim:#8d9aa6;
+  --line:#313c47; --line-strong:#4a5865;
+  --accent-search:#6fb3e8; --accent-search-soft:#152b3f;
+  --accent-critic:#f0a15c; --accent-critic-soft:#3a2410;
+  --accent-judge:#3fddb6; --accent-judge-soft:#0f2e28;
+  --accent-info:#a495f5; --accent-info-soft:#2a2350;
+  --tok-keyword:#c297ff; --tok-string:#7ee2ac; --tok-comment:#8d9aa6;
+  --tok-number:#f0a15c; --tok-func:#6fb3e8; --tok-class:#f0a15c;
+}
+*{box-sizing:border-box;}
+html,body{background:var(--bg);}
+body{ color:var(--ink); font-family:var(--font-sans); margin:0; padding:48px 20px 80px; }
+main{ max-width:940px; margin:0 auto; display:flex; flex-direction:column; gap:40px; }
+header{ display:flex; flex-direction:column; gap:10px; border-bottom:1px solid var(--line); padding-bottom:28px; }
+h1{ font-size:1.6rem; font-weight:650; letter-spacing:-0.01em; margin:0; text-wrap:balance; }
+.subtitle{ color:var(--ink-dim); font-size:0.95rem; line-height:1.6; }
+h2{ font-size:1.15rem; font-weight:650; margin:0 0 14px; }
+h3{ font-size:0.95rem; font-weight:650; margin:0 0 8px; }
+section{ display:flex; flex-direction:column; gap:16px; }
+.card{
+  background:var(--surface); border:1px solid var(--line); border-left:4px solid var(--line-strong);
+  border-radius:12px; padding:22px 24px;
+}
+.card-search{ border-left-color:var(--accent-search); }
+.card-critic{ border-left-color:var(--accent-critic); }
+.card-judge{ border-left-color:var(--accent-judge); }
+.card-info{ border-left-color:var(--accent-info); }
+p{ line-height:1.7; margin:0; color:var(--ink); }
+p + p{ margin-top:10px; }
+code{ font-family:var(--font-mono); background:var(--surface-2); padding:1px 6px; border-radius:5px; font-size:0.88em; }
+pre{
+  font-family:var(--font-mono); background:var(--surface-2); border:1px solid var(--line);
+  border-radius:8px; padding:14px 16px; font-size:0.82rem; line-height:1.6; overflow-x:auto; white-space:pre-wrap;
+}
+.tok-keyword{ color:var(--tok-keyword); font-weight:600; }
+.tok-string{ color:var(--tok-string); }
+.tok-comment{ color:var(--tok-comment); font-style:italic; }
+.tok-number{ color:var(--tok-number); }
+.tok-func{ color:var(--tok-func); }
+.tok-class{ color:var(--tok-class); }
+table{ width:100%; border-collapse:collapse; font-size:0.9rem; }
+th,td{ text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+th{ color:var(--ink-dim); font-weight:600; }
+tr:last-child td{ border-bottom:none; }
+.tag{ display:inline-block; font-size:0.78rem; font-weight:600; padding:2px 9px; border-radius:999px; }
+.tag-search{ background:var(--accent-search-soft); color:var(--accent-search); }
+.tag-critic{ background:var(--accent-critic-soft); color:var(--accent-critic); }
+.tag-judge{ background:var(--accent-judge-soft); color:var(--accent-judge); }
+.note{ font-size:0.85rem; color:var(--ink-dim); border-left:3px solid var(--line-strong); padding-left:12px; }
+.good{ color:var(--accent-judge); font-weight:600; }
+.mark{ padding:0.05em 0.3em; border-radius:4px; font-weight:600; }
+.mark-info{ background:var(--accent-info-soft); color:var(--accent-info); }
+.mark-search{ background:var(--accent-search-soft); color:var(--accent-search); }
+.mark-critic{ background:var(--accent-critic-soft); color:var(--accent-critic); }
+.mark-judge{ background:var(--accent-judge-soft); color:var(--accent-judge); }
+svg text{ font-family:var(--font-sans); fill:var(--ink); }
+.diagram{ overflow-x:auto; }
+footer{ color:var(--ink-dim); font-size:0.82rem; border-top:1px solid var(--line); padding-top:20px; }
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <h1>Agentic RAG(LangGraph版)のしくみ</h1>
+  <p class="subtitle">
+    <code>scripts/agentic_query.py</code> の実装解説。単発の<code>query.py</code>(検索して1回で答えるだけ)の
+    弱点を補うため、検索者・批評者・判定者の3役をLangGraphの<code>StateGraph</code>として実装している。
+  </p>
+</header>
+
+<section class="card card-info">
+  <h2>グラフ構造</h2>
+  <div class="diagram">
+    <svg viewBox="0 0 900 380" width="900" height="380" xmlns="http://www.w3.org/2000/svg">
+      <rect x="360" y="10" width="180" height="42" rx="8" fill="var(--surface-2)" stroke="var(--line-strong)"/>
+      <text x="450" y="36" font-size="13" text-anchor="middle" font-weight="600">START</text>
+      <line x1="450" y1="52" x2="450" y2="86" stroke="var(--line-strong)" stroke-width="2" marker-end="url(#arrow)"/>
+
+      <rect x="340" y="86" width="220" height="50" rx="8" fill="var(--accent-search-soft)" stroke="var(--accent-search)"/>
+      <text x="450" y="108" font-size="13" text-anchor="middle" font-weight="600">search</text>
+      <text x="450" y="125" font-size="10" text-anchor="middle" fill="var(--ink-dim)">state.query でFAISS検索、passagesに追加</text>
+      <line x1="450" y1="136" x2="450" y2="170" stroke="var(--line-strong)" stroke-width="2" marker-end="url(#arrow)"/>
+
+      <rect x="340" y="170" width="220" height="50" rx="8" fill="var(--accent-critic-soft)" stroke="var(--accent-critic)"/>
+      <text x="450" y="192" font-size="13" text-anchor="middle" font-weight="600">critic</text>
+      <text x="450" y="209" font-size="10" text-anchor="middle" fill="var(--ink-dim)">十分か判定、不足ならクエリ提案</text>
+
+      <line x1="450" y1="220" x2="450" y2="245" stroke="var(--line-strong)" stroke-width="2"/>
+      <polygon points="450,245 480,270 450,295 420,270" fill="var(--surface-2)" stroke="var(--line-strong)" stroke-width="2"/>
+      <text x="450" y="274" font-size="10" text-anchor="middle" font-weight="600">route</text>
+
+      <line x1="480" y1="270" x2="700" y2="270" stroke="var(--line-strong)" stroke-width="2"/>
+      <text x="590" y="262" font-size="10" text-anchor="middle" fill="var(--accent-judge)" font-weight="600">"judge"</text>
+      <line x1="700" y1="270" x2="700" y2="300" stroke="var(--line-strong)" stroke-width="2" marker-end="url(#arrow)"/>
+
+      <line x1="450" y1="295" x2="450" y2="320" stroke="var(--line-strong)" stroke-width="2"/>
+      <text x="380" y="312" font-size="10" text-anchor="middle" fill="var(--accent-critic)" font-weight="600">"research_again"</text>
+
+      <rect x="140" y="320" width="220" height="46" rx="8" fill="var(--accent-search-soft)" stroke="var(--accent-search)"/>
+      <text x="250" y="340" font-size="12" text-anchor="middle" font-weight="600">prepare_next_round</text>
+      <text x="250" y="357" font-size="9" text-anchor="middle" fill="var(--ink-dim)">query更新, round += 1</text>
+
+      <line x1="140" y1="343" x2="80" y2="343" stroke="var(--line-strong)" stroke-width="2"/>
+      <line x1="80" y1="343" x2="80" y2="111" stroke="var(--line-strong)" stroke-width="2"/>
+      <line x1="80" y1="111" x2="335" y2="111" stroke="var(--line-strong)" stroke-width="2" marker-end="url(#arrow)"/>
+      <text x="60" y="230" font-size="10" fill="var(--accent-search)" font-weight="600" transform="rotate(-90 60 230)">ループ(最大--max_rounds回)</text>
+
+      <rect x="590" y="300" width="220" height="50" rx="8" fill="var(--accent-judge-soft)" stroke="var(--accent-judge)"/>
+      <text x="700" y="322" font-size="13" text-anchor="middle" font-weight="600">judge</text>
+      <text x="700" y="339" font-size="10" text-anchor="middle" fill="var(--ink-dim)">全passages+批評から最終回答</text>
+      <line x1="700" y1="350" x2="700" y2="370" stroke="var(--line-strong)" stroke-width="2" marker-end="url(#arrow)"/>
+
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 z" fill="var(--line-strong)"/>
+        </marker>
+      </defs>
+      <text x="700" y="378" font-size="11" text-anchor="middle" font-weight="600">END</text>
+    </svg>
+  </div>
+  <p class="note">
+    <span class="mark mark-info">「再検索」は独立した人格ではなく、批評者が提案したクエリを使った機械的なFAISS検索</span>に過ぎない。
+    LLM呼び出しは①検索者は無し(検索のみ)、②批評者、③判定者の計2回(1ラウンドあたり)。
+  </p>
+</section>
+
+<section class="card card-info">
+  <h2>State(状態)の設計</h2>
+  <pre class="code-python">class GraphState(TypedDict):
+    question: str        # 元の質問(変わらない)
+    query: str            # 現在の検索クエリ(初回は question、以降は批評者の提案)
+    passages: list[dict]  # 全ラウンドで蓄積された検索結果
+    critic_text: str      # 直近の批評者の判定文
+    round: int             # 現在のラウンド数(0始まり)
+    answer: str            # 最終回答(judgeノードでのみ書き込み)</pre>
+  <p>
+    <span class="mark mark-info">1つの<code>State</code>を全ノードが読み書きする</span>ため、
+    複数の変数を手動で受け渡しするコードに比べ、渡し忘れによるバグが起きにくい。
+  </p>
+</section>
+
+<section class="card card-info">
+  <h2><code>load_llm()</code> の詳解</h2>
+  <p>Qwen2.5-7B-Instructを4bit量子化でロードし、LangChainの<code>ChatModel</code>として使える形に3段階でラップしている。</p>
+  <pre class="code-python">def load_llm(gen_model_name):
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.float16,
+        bnb_4bit_use_double_quant=True,
+    )
+    tokenizer = AutoTokenizer.from_pretrained(gen_model_name)
+    model = AutoModelForCausalLM.from_pretrained(
+        gen_model_name,
+        quantization_config=bnb_config,
+        device_map={"": 0},
+        dtype=torch.float16,
+        disable_mmap=True,
+    )
+    hf_pipe = pipeline(
+        "text-generation", model=model, tokenizer=tokenizer,
+        max_new_tokens=350, do_sample=True, temperature=0.5, top_p=0.9, return_full_text=False,
+    )
+    llm = HuggingFacePipeline(pipeline=hf_pipe)
+    return ChatHuggingFace(llm=llm, tokenizer=tokenizer)</pre>
+
+  <h3>1. <code>BitsAndBytesConfig</code></h3>
+  <table>
+    <tr><th>引数</th><th>意味</th></tr>
+    <tr><td><code>load_in_4bit=True</code></td><td>重みを4bitに量子化してロードする。VRAM 11GBのGPUで7Bモデルを動かすための必須設定</td></tr>
+    <tr><td><code>bnb_4bit_quant_type="nf4"</code></td><td>NormalFloat4(NF4)方式。正規分布に従う重みの分布に最適化された4bit表現</td></tr>
+    <tr><td><code>bnb_4bit_compute_dtype=torch.float16</code></td><td><span class="mark mark-critic">Pascal世代GPU(GTX 10xx等)はbfloat16の演算に対応していない</span>ため、必ずfloat16を指定する必要がある</td></tr>
+    <tr><td><code>bnb_4bit_use_double_quant=True</code></td><td>量子化のスケール定数自体もさらに量子化し、メモリを追加で数%削減する</td></tr>
+  </table>
+
+  <h3>2. モデルロード</h3>
+  <table>
+    <tr><th>引数</th><th>意味</th></tr>
+    <tr><td><code>device_map={"": 0}</code></td><td>モデル全体をGPU 0番に固定配置(単一GPU環境)</td></tr>
+    <tr><td><code>disable_mmap=True</code></td><td><span class="mark mark-critic">ネットワークドライブ上のモデルをmmapでロードするとSegmentation faultが起きる</span>既知の問題への対策</td></tr>
+  </table>
+
+  <h3>3. LangChainラッパーへの2段変換</h3>
+  <p>
+    <code>HuggingFacePipeline</code>がtransformersの<code>pipeline</code>をLangChainの<code>Runnable</code>に適合させ、
+    <span class="mark mark-info"><code>ChatHuggingFace</code>がその上に被さって<code>tokenizer.apply_chat_template</code>を
+    自動適用する</span>ことで、<code>SystemMessage</code>/<code>HumanMessage</code>のようなチャットメッセージ列を
+    直接扱えるようになる。
+  </p>
+</section>
+
+<section class="card card-judge">
+  <h2>実行結果(実測)</h2>
+  <p>質問「RAGとは何ですか？」で <code>data/sample_corpus.jsonl</code> のインデックスに対して実行。</p>
+  <table>
+    <tr><th>段階</th><th>結果</th></tr>
+    <tr>
+      <td><span class="tag tag-search">search (round 0)</span></td>
+      <td>「RAG」「FAISS」「LoRA」の技術解説パッセージを3件取得</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-critic">critic (round 0)</span></td>
+      <td><span class="mark mark-judge">「十分」「追加検索クエリ: なし」と正しく判定</span>、1ラウンドで終了</td>
+    </tr>
+    <tr>
+      <td><span class="tag tag-judge">judge</span></td>
+      <td>検索結果[1]の内容を正確に反映した簡潔な回答を生成</td>
+    </tr>
+  </table>
+</section>
+
+<section class="card card-critic">
+  <h2><code>query.py</code> との違い</h2>
+  <table>
+    <tr><th>観点</th><th><code>query.py</code></th><th><code>agentic_query.py</code></th></tr>
+    <tr><td>検索回数</td><td>1回のみ</td><td>批評者が納得するまで最大<code>--max_rounds</code>回</td></tr>
+    <tr><td>制御フロー</td><td>if文なし(常に1回で完結)</td><td><code>add_conditional_edges</code>でグラフの分岐として表現</td></tr>
+    <tr><td>状態の受け渡し</td><td>関数の戻り値をそのまま使う</td><td>1つの<code>TypedDict State</code>に集約</td></tr>
+    <tr><td>他システムへの組み込み</td><td>スクリプトとして独立</td><td>コンパイル済みグラフはRunnableなので、より大きなLangGraphのノードとして再利用可能</td></tr>
+  </table>
+</section>
+
+<footer>
+  作成: <code>scripts/agentic_query.py</code> の実装と、実際の実行ログに基づく。
+</footer>
+
+</main>
+
+<script>
+(function () {
+  function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  var TOKEN_RE = new RegExp(
+    "(?<comment>#.*)" +
+    "|(?<string>\"\"\"[\\s\\S]*?\"\"\"|'''[\\s\\S]*?'''|\"[^\"\\n]*\"|'[^'\\n]*')" +
+    "|(?<keyword>\\b(?:def|return|class|import|from|as|if|elif|else|for|while|in|is|not|and|or|True|False|None|self|with|try|except|raise|lambda|pass|break|continue|yield|async|await)\\b)" +
+    "|(?<number>\\b\\d+(?:\\.\\d+)?\\b)" +
+    "|(?<klass>\\b[A-Z][A-Za-z0-9_]*\\b)" +
+    "|(?<func>\\b[a-zA-Z_]\\w*(?=\\())",
+    "g"
+  );
+  var ORDER = ["comment", "string", "keyword", "number", "klass", "func"];
+  var CLASS_MAP = { comment: "tok-comment", string: "tok-string", keyword: "tok-keyword",
+                     number: "tok-number", klass: "tok-class", func: "tok-func" };
+  function highlight(code) {
+    var out = "", last = 0, m;
+    TOKEN_RE.lastIndex = 0;
+    while ((m = TOKEN_RE.exec(code))) {
+      out += esc(code.slice(last, m.index));
+      var g = m.groups, type = null;
+      for (var i = 0; i < ORDER.length; i++) { if (g[ORDER[i]] !== undefined) { type = ORDER[i]; break; } }
+      out += '<span class="' + CLASS_MAP[type] + '">' + esc(m[0]) + "</span>";
+      last = TOKEN_RE.lastIndex;
+    }
+    out += esc(code.slice(last));
+    return out;
+  }
+  document.querySelectorAll("pre.code-python").forEach(function (pre) {
+    pre.innerHTML = highlight(pre.textContent);
+  });
+})();
+</script>
+</body>
+</html>
