@@ -99,6 +99,10 @@ $ python query.py --index ../out --question "フランス料理のおすすめ�
 批評者が「情報が足りない」と判定した場合、提案されたクエリで自動的に再検索し、
 `--max_rounds`(既定2)まで繰り返す。
 
+![Agentic RAGのグラフ構造](assets/agentic_rag_diagram.png)
+
+*`docs/agentic_rag_architecture.html`より。LLM呼び出しは1ラウンドあたり2回(批評者・判定者)で、再検索クエリの生成自体は批評者の出力をそのまま使う機械的な処理。*
+
 ```bash
 python agentic_query.py --index ../out --question "質問文をここに"
 ```
