@@ -99,6 +99,8 @@ $ python query.py --index ../out --question "フランス料理のおすすめ�
 批評者が「情報が足りない」と判定した場合、提案されたクエリで自動的に再検索し、
 `--max_rounds`(既定2)まで繰り返す。
 
+**グラフ構造の図解:** https://glico1tubu300meter.github.io/rag-basic-toolkit/docs/agentic_rag_architecture.html
+
 ```bash
 python agentic_query.py --index ../out --question "質問文をここに"
 ```
